@@ -73,7 +73,7 @@ def send_email(body):
     server_ssl.sendmail(SENDER_EMAIL,RECEIVER_EMAIL,email_text)
     server_ssl.close()
 
-    except:
+  except:
       print('Something went wrong...')
 
 def lambda_handler(event, context):
@@ -92,7 +92,7 @@ def lambda_handler(event, context):
         "statusCode": 200,
         "body": videos_data
     }
-  return response
+    return response
 
 
   

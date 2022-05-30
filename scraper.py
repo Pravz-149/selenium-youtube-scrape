@@ -1,3 +1,6 @@
+import os
+import json
+import smtplib
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -7,18 +10,19 @@ YOUTUBE_TRENDING_URL = 'https://www.youtube.com/feed/trending?bp=4gIKGgh0cmFpbGV
 
 
 def get_driver():
-    chrome_options = Options()
+    options = Options()
+    options.binary_location = '/opt/headless-chromium'
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--single-process')
     chrome_options.add_argument('--disable-dev-shm-usage')
     driver = webdriver.Chrome(options=chrome_options)
     return driver
 
 
 def get_videos(driver):
-    driver.get(YOUTUBE_TRENDING_URL)
-    print('Page Title:', driver.title)
     VIDEO_DIV_TAG = "ytd-video-renderer"
+    driver.get(YOUTUBE_TRENDING_URL)
     videos = driver.find_elements(By.TAG_NAME, VIDEO_DIV_TAG)
     return videos
 
@@ -46,26 +50,49 @@ def parse_video(video):
     description_text = description_tag.text
 
     return {
-        'Title:', title, 'url:', url, 'Thumbnail URL:', thumbnail_url,
-        "channel name:", channel_name, "Description Text:", description_text
+        'Title': title, 'url': url, 'Thumbnail URL': thumbnail_url,
+        'channel name': channel_name, 'Description Text': description_text
     }
 
+def send_email(body):
+  try:
+    server_ssl = smtplib.SMTP_SSL('smtp.gmail.com',465)
+    server_ssl.ehlo()
+    SENDER_EMAIL = 'pravallikatrailmail@gmail.com'
+    RECEIVER_EMAIL = 'pravallika14998@gmail.com'
+    my_secret = os.environ['GMAIL_PASSWORD']
 
-if __name__ == '__main__':
-    print('creating driver')
+    subject = 'YouTube Trending Videos'
+    email_text = f"""
+    From:{SENDER_EMAIL}
+    To:{RECEIVER_EMAIL}
+    Subject:{subject}
+    {body}
+    """
+    server_ssl.login(SENDER_EMAIL,my_secret)
+    server_ssl.sendmail(SENDER_EMAIL,RECEIVER_EMAIL,email_text)
+    server_ssl.close()
+
+    except:
+      print('Something went wrong...')
+
+def lambda_handler(event, context):
+    #Create the browser
     driver = get_driver()
-
-    print('Fetching trending videos')
+    #Get the Videos here
     videos = get_videos(driver)
-
-    print(f'Found {len(videos)} videos')
-
-    print('Parsing top 10 Videos')
+    #Parse the top 10 videos
     videos_data = [parse_video(video) for video in videos[:10]]
+    #Send the data over email
+    body = json.dumps(videos_data)
+    send_email(body)
+    driver.close();
+    driver.quit();
+    response = {
+        "statusCode": 200,
+        "body": videos_data
+    }
+  return response
 
-    print('Save the data to a CSV')
-    videos_df = pd.DataFrame(videos_data)
-    print(videos_df)
-    videos_df.to_csv('trending.csv')
 
   
